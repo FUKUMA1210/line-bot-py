@@ -59,7 +59,7 @@ def handle_message(event):
     else:
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text='Please input valid keyword!'))
+            TextSendMessage(text='請輸入正確關鍵字'))
 
 if __name__ == "__main__":
 
