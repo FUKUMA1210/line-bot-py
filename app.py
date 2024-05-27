@@ -1,58 +1,78 @@
-from flask import Flask, request
-
-# 載入 json 標準函式庫，處理回傳的資料格式
+from flask import Flask, request, abort
 import json
-
-# 載入 LINE Message API 相關函式庫
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
 app = Flask(__name__)
 
-@app.route("/", methods=['POST'])
-def linebot():
-    body = request.get_data(as_text=True)                    # 取得收到的訊息內容
-    try:
-        json_data = json.loads(body)                         # json 格式化訊息內容
-        access_token = 'UHoIQNmTwqPjqUcvF8NXGIRRyjM+/1mX/kIX+qOtjqqsJhhEUSPqeXmNwXSXpDFoA+gjZivwSi7yqQ55s16yvGc4kC4u1/OqDmLBX0qAw4uI5YVbiFdyLmalKlOon9+xsaNLM++6XWcbcQ6CWcnpzwdB04t89/1O/w1cDnyilFU='
-        secret = 'ef1cc014485b4be2b8297e1d0827b0ab'
-        line_bot_api = LineBotApi(access_token)              # 確認 token 是否正確
-        handler = WebhookHandler(secret)                     # 確認 secret 是否正確
-        signature = request.headers['X-Line-Signature']      # 加入回傳的 headers
-        handler.handle(body, signature)                      # 綁定訊息回傳的相關資訊
-        tk = json_data['events'][0]['replyToken']            # 取得回傳訊息的 Token
-        type = json_data['events'][0]['message']['type']     # 取得 LINe 收到的訊息類型
-        if type=='text':
-            msg = json_data['events'][0]['message']['text']  # 取得 LINE 收到的文字訊息
-            print(msg)                                       # 印出內容
-            reply = msg
-        else:
-            reply = '你傳的不是文字呦～'
-        print(reply)
-        line_bot_api.reply_message(tk,TextSendMessage(reply))# 回傳訊息
-    except:
-        print(body)                                          # 如果發生錯誤，印出收到的內容
-    return 'OK'                                              # 驗證 Webhook 使用，不能省略
+# 初始化 LineBotApi 和 WebhookHandler
+access_token = 'UHoIQNmTwqPjqUcvF8NXGIRRyjM+/1mX/kIX+qOtjqqsJhhEUSPqeXmNwXSXpDFoA+gjZivwSi7yqQ55s16yvGc4kC4u1/OqDmLBX0qAw4uI5YVbiFdyLmalKlOon9+xsaNLM++6XWcbcQ6CWcnpzwdB04t89/1O/w1cDnyilFU='
+secret = 'ef1cc014485b4be2b8297e1d0827b0ab'
+line_bot_api = LineBotApi(access_token)
+handler = WebhookHandler(secret)
 
+# 定義全局的 tasks 列表
+tasks = []
+
+@app.route("/callback", methods=['POST'])
+def callback():
+    # 獲取 LINE 平台傳送過來的 request body
+    signature = request.headers['X-Line-Signature']
+    body = request.get_data(as_text=True)
+    app.logger.info("Request body: " + body)
+
+    try:
+        handler.handle(body, signature)
+    except InvalidSignatureError:
+        abort(400)
+
+    return 'OK'
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    message_text = event.message.text
+    global tasks
+    user_message = event.message.text
+    response_message = ""
 
-    if message_text == '管理行程':
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text='請輸入「增加」、「修改」或「刪除」來操作功能\n如需設定通知請輸入「設定通知」'))
-    elif message_text == '待辦事項':
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text='請輸入「增加」、「修改」或「刪除」來操作功能\n如需設定通知請輸入「設定通知」'))
+    if user_message.lower() == "事項列表":
+        if tasks:
+            response_message = "你的待辦事項：\n" + "\n".join([f"{'✔️' if task['completed'] else ''} {task['name']}" for task in tasks])
+        else:
+            response_message = "目前沒有待辦事項。"
+    elif user_message.startswith("新增"):
+        task_name = user_message[3:]
+        tasks.append({"name": task_name, "completed": False})
+        response_message = f"已新增事項：{task_name}"
+    elif user_message.startswith("刪除"):
+        task_name = user_message[3:]
+        task_found = False
+        for task in tasks:
+            if task['name'] == task_name:
+                tasks.remove(task)
+                task_found = True
+                response_message = f"已刪除事項：{task_name}"
+                break
+        if not task_found:
+            response_message = f"找不到事項：{task_name}"
+    elif user_message.startswith("完成"):
+        task_name = user_message[3:]
+        task_found = False
+        for task in tasks:
+            if task['name'] == task_name:
+                task['completed'] = True
+                task_found = True
+                response_message = f"已完成事項：{task_name}"
+                break
+        if not task_found:
+            response_message = f"找不到事項：{task_name}"
     else:
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text='請輸入正確關鍵字'))
+        response_message = "請輸入 '事項列表' 來顯示所有待辦事項，或使用 '新增<您的事項名稱>' 來新增事項，或使用 '刪除<您的事項名稱>' 來刪除事項，或使用 '完成<您的事項名稱>' 來標記事項為完成。"
+
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextSendMessage(text=response_message)
+    )
 
 if __name__ == "__main__":
-
-    app.run()
+    app.run(port=5000)
