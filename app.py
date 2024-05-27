@@ -35,6 +35,32 @@ def linebot():
         print(body)                                          # 如果發生錯誤，印出收到的內容
     return 'OK'                                              # 驗證 Webhook 使用，不能省略
 
+
+@handler.add(MessageEvent, message=TextMessage)
+def handle_message(event):
+    message_text = event.message.text
+
+    if message_text == '管理行程':
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text='請輸入「增加」、「修改」或「刪除」來操作功能\n如需設定通知請輸入「設定通知」'))
+    elif message_text == '待辦事項':
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text='請輸入「增加」、「修改」或「刪除」來操作功能\n如需設定通知請輸入「設定通知」'))
+    elif message_text == '???????':
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text='This is keyword for @register!'))
+    elif message_text == '@message':
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text='This is keyword for @message!'))
+    else:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text='Please input valid keyword!'))
+
 if __name__ == "__main__":
 
     app.run()
