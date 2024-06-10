@@ -7,8 +7,6 @@ from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage, TemplateSendMessage, ButtonsTemplate, PostbackAction, DatetimePickerAction, PostbackEvent, QuickReply, QuickReplyButton, FlexSendMessage, BubbleContainer, BoxComponent, TextComponent, ButtonComponent, SeparatorComponent
 )
 import sqlite3
-import requests
-from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
@@ -488,28 +486,6 @@ def create_task_flex_message(task_name):
         )
     )
     return flex_message
-
-# 定義 ping 函數
-def send_ping():
-    try:
-        response = requests.get('https://line-bot-pyt.onrender.com')  # 替換為你的 Render URL
-        print(f'Ping response status: {response.status_code}')
-    except Exception as e:
-        print(f'Error sending ping: {e}')
-
-# 設置定時任務
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=send_ping, trigger="interval", minutes=10)  # 每 10 分鐘發送一次 ping
-scheduler.start()
-
-# 關閉應用時關閉定時任務
-@app.before_first_request
-def init_scheduler():
-    scheduler.start()
-
-@app.route('/')
-def home():
-    return 'Hello, this is your LINE Bot running!'
 
 if __name__ == "__main__":
     app.run(port=5000)
